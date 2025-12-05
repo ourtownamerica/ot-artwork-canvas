@@ -3,10 +3,19 @@
 A simple component that allows the user to drag and drop a file into a canvas to ensure it's the correct size for a given print product.
 
 ##### Dependencies:
+
+`Canvas Layers` must be version 2.1.x and `File Input` must be version 2.1.x.
+
 - [Pamblam/file-input](https://github.com/Pamblam/file-input)
 - [Pamblam/canvas-layers](https://github.com/Pamblam/canvas-layers)
 
+##### Demo:
+
+See the demo [here](https://ourtownamerica.github.io/ot-artwork-canvas/demo/).
+
 ##### Usage:
+
+Just copy the `ot-artwork-canvas.jsx` file and update the paths to dependencies. 
 
 ```jsx
 <OTArtCanvas 
