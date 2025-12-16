@@ -15,7 +15,7 @@ See the demo [here](https://ourtownamerica.github.io/ot-artwork-canvas/demo/).
 
 ##### Usage:
 
-Just copy the `ot-artwork-canvas.jsx` file and update the paths to dependencies. 
+Just copy the `ot-artwork-canvas.jsx` file and update the paths to depsendencies. 
 
 ```jsx
 <OTArtCanvas 
@@ -29,14 +29,14 @@ Just copy the `ot-artwork-canvas.jsx` file and update the paths to dependencies.
 	// Any CSS styles to add tho the canvas
 	style={{border:'1px solid black'}} 
 
-	// DOM elements that, when clicked, should open the file chooser
-	openFileChooserOnClick={document.querySelectorAll('.clickme')}
+	// a DOM ref that, when clicked, should open the file chooser
+	openFileChooserOnClick={ref1}
 
-	// DOM elements that, when clicked, should auto-resize the image to fit the correct size
-	fillImageOnClick={document.querySelectorAll('.fillimgbtn')}
+	// a DOM ref that, when clicked, should auto-resize the image to fit the correct size
+	fillImageOnClick={ref2}
 
-	// DOM elements that, when clicked, should auto-resize the canvas
-	centerImageOnClick={document.querySelectorAll('.centerimgbtn')}
+	// a DOM ref that, when clicked, should auto-resize the canvas
+	centerImageOnClick={ref3}
 
 	// A function that is called when the user uploads an invalid file
 	onBadFile={()=>alert('That file is not acceptable. PNG or JPG only pleez.')}

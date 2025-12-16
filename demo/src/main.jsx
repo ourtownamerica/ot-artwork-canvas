@@ -1,39 +1,35 @@
-import {createRoot} from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import OTArtCanvas from './ot-artwork-canvas.jsx';
+import { useRef, useState } from 'react';
 
-let finalImage = null;
+function Main(){
+	let [imgDataUri, setImgDataUri] = useState(null);
 
-let canvas = <OTArtCanvas 
+	let fillBtnRef = useRef(null);
+	let centerBtnRef = useRef(null);
+	let fiBtnRef = useRef(null);
 
-	// The width of the required artwork
-	width={500} 
+	const onOpenImg = ()=>{
+		if(imgDataUri) open(imgDataUri, '_blank');
+	};
 
-	// The height of the required artwork
-	height={300} 
+	return <>
 
-	// Any CSS styles to add tho the canvas
-	style={{border:'1px solid black'}} 
+		<p>Upload your art... drag your image into the canvas or <a href="#" ref={fiBtnRef}>click here</a></p>
+		<p><a href="#" ref={fillBtnRef}>Fill Image</a> | <a href="#" ref={centerBtnRef}>Center Image</a> | <a href="#" onClick={onOpenImg}>Open Image</a></p>
 
-	// DOM elements that, when clicked, should open the file chooser
-	openFileChooserOnClick={document.querySelectorAll('.clickme')}
-
-	// DOM elements that, when clicked, should auto-resize the image to fit the correct size
-	fillImageOnClick={document.querySelectorAll('.fillimgbtn')}
-
-	// DOM elements that, when clicked, should auto-resize the canvas
-	centerImageOnClick={document.querySelectorAll('.centerimgbtn')}
-
-	// A function that is called when the user uploads an invalid file
-	onBadFile={()=>alert('That file is not acceptable. PNG or JPG only pleez.')}
-	
-	// Function to handle the image change
-	onChange={img=>finalImage=img}
-/>
-
-document.querySelector('.getimg').addEventListener('click', e=>{
-	e.preventDefault();
-	if(finalImage) open(finalImage, '_blank')
-});
+		<OTArtCanvas
+			width={500}
+			height={300}
+			style={{ border: '1px solid black' }}
+			openFileChooserOnClick={fiBtnRef}
+			fillImageOnClick={fillBtnRef}
+			centerImageOnClick={centerBtnRef}
+			onBadFile={() => alert('That file is not acceptable. PNG or JPG only pleez.')}
+			onChange={setImgDataUri}
+		/>
+	</>;
+}
 
 let artCanvasRoot = createRoot(document.getElementById('otartcanvas'));
-artCanvasRoot.render(canvas);
+artCanvasRoot.render(<Main />);
