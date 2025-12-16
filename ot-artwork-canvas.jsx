@@ -7,6 +7,7 @@ export default function OTArtCanvas({
 	height,
 	padding = 25,
 	style = {},
+	imgDataUri = null,
 	openFileChooserOnClick = null,
 	onBadFile = null,
 	fillImageOnClick = null,
@@ -27,11 +28,12 @@ export default function OTArtCanvas({
 	let [layerUri, setLayerUri] = useState(null);
 	let [layerPos, setLayerPos] = useState(null);
 
-	// Keep latest callbacks without re-running init
+	// Keeps the latest onChange callback in a ref so Canvas event handlers always call the newest function without re-initializing the Canvas instance.
 	useEffect(()=>{
 		onChangeRef.current = onChange;
 	}, [onChange]);
 
+	// Keeps the latest onBadFile callback in a ref so the FI handler always calls the newest function without re-initializing the Canvas instance.
 	useEffect(()=>{
 		onBadFileRef.current = onBadFile;
 	}, [onBadFile]);
@@ -56,7 +58,7 @@ export default function OTArtCanvas({
 			});
 	};
 
-	// INIT ONCE
+	// Initializes the Canvas + FI instances once, wires up internal canvas event listeners, border overlay drawing, drag/drop upload, and cleans everything up on unmount.
 	useEffect(()=>{
 		aliveRef.current = true;
 
@@ -88,13 +90,20 @@ export default function OTArtCanvas({
 			canvas.ctx.fillRect(0, safeY, safeX, safeH);
 			canvas.ctx.fillRect(safeX + safeW, safeY, cw - (safeX + safeW), safeH);
 
+			// Scale line width so it renders as ~2 CSS pixels even if the canvas is CSS-scaled (max-width: 100%, etc.)
+			const rect = canvas.canvas.getBoundingClientRect();
+			const sx = canvas.canvas.width / rect.width;
+			const linePx = 2;
+			canvas.ctx.lineWidth = linePx * sx;
+			const dashOn = 4 * sx;
+			const dashOff = 2 * sx;
+			canvas.ctx.setLineDash([dashOn, dashOff]);
+
 			canvas.ctx.strokeStyle = "black";
-			canvas.ctx.lineWidth = 2;
-			canvas.ctx.setLineDash([4, 2]);
 			canvas.ctx.strokeRect(padding, padding, width - 2, height - 2);
 			canvas.ctx.restore();
 
-			// Save latest layer pos (use activeLayer if present)
+			// Save latest layer pos (use activeLayer if present) with a short debounce
 			let layer = canvas.activeLayer || canvas.layers[0];
 			if(layer){
 				if(debouncer) clearTimeout(debouncer);
@@ -172,7 +181,7 @@ export default function OTArtCanvas({
 			}
 		};
 
-		// Save pos frequently during manipulation (better than drawBorder)
+		// Persists the current layer transform to React state (so you can re-add it later) and emits an updated cropped preview.
 		const onLayerChange = () => {
 			let layer = canvas.activeLayer || canvas.layers[0];
 			if(layer){
@@ -219,7 +228,7 @@ export default function OTArtCanvas({
 		canvas.canvas.addEventListener("canvas-drawn", drawBorder);
 		document.addEventListener("click", clearSelection);
 
-		// Expose handlers for binding effect
+		// Expose handlers for the external button-binding effect
 		canvasRef.current._centerImg = centerImg;
 		canvasRef.current._fillImg = fillImg;
 
@@ -251,40 +260,100 @@ export default function OTArtCanvas({
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []); // <-- INIT ONCE
 
-	// Re-add layer on mount / when saved state changes
+	// Preloads imgDataUri onto the canvas when the prop is provided (or changes). It loads the image to get natural dimensions, computes a centered "fit" position, stores uri+pos in state, then adds the layer and emits the cropped preview only after the layer finishes loading.
+	useEffect(()=>{
+		if(!imgDataUri) return;
+		if(layerUri === imgDataUri) return;
+
+		let canvas = canvasRef.current;
+		if(!aliveRef.current) return;
+		if(!canvas || !canvas.canvas) return;
+
+		uriRef.current = imgDataUri;
+		setLayerUri(imgDataUri);
+
+		let img = new Image();
+		imgRef.current = img;
+
+		img.onload = ()=>{
+			if(!aliveRef.current) return;
+
+			const scale = Math.min(width / img.width, height / img.height);
+			const pos = {
+				width: img.width * scale,
+				height: img.height * scale,
+				x: padding + width / 2,
+				y: padding + height / 2,
+				rotation: 0
+			};
+
+			setLayerPos(pos);
+
+			canvas.removeAllLayers();
+
+			let layer = canvas.addLayer(imgDataUri, pos);
+			layer.onload(()=>{
+				if(!aliveRef.current) return;
+				emitExtract();
+			});
+		};
+
+		img.src = imgDataUri;
+
+		return ()=>{
+			img.onload = null;
+		};
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [imgDataUri]); // intentionally not depending on layerUri to avoid loop
+
+	// Re-adds the saved image layer when layerUri changes (upload or preload). If we already have a saved position, it uses it; otherwise it falls back to centering the image. Extraction is delayed until the layer has fully loaded to avoid drawImage(null) errors.
 	useEffect(()=>{
 		let canvas = canvasRef.current;
 		if(!aliveRef.current) return;
 		if(!canvas || !canvas.canvas) return;
 		if(!layerUri) return;
 
-		// Keep uriRef/imgRef synced
 		uriRef.current = layerUri;
 
+		// Ensure we have an Image() in imgRef so center/fill buttons have dimensions.
 		if(!imgRef.current || imgRef.current.src !== layerUri){
 			let img = new Image();
 			imgRef.current = img;
+
 			img.onload = ()=>{
 				if(!aliveRef.current) return;
+
+				// If position exists, just add it. Otherwise center it.
 				if(layerPos){
-					canvas.addLayer(layerUri, layerPos);
+					canvas.removeAllLayers();
+					let layer = canvas.addLayer(layerUri, layerPos);
+					layer.onload(()=>{
+						if(!aliveRef.current) return;
+						emitExtract();
+					});
 				}else{
 					canvasRef.current?._centerImg?.();
 				}
 			};
+
 			img.src = layerUri;
 			return;
 		}
 
 		if(layerPos){
-			canvas.addLayer(layerUri, layerPos);
+			canvas.removeAllLayers();
+			let layer = canvas.addLayer(layerUri, layerPos);
+			layer.onload(()=>{
+				if(!aliveRef.current) return;
+				emitExtract();
+			});
 		}else{
 			canvasRef.current?._centerImg?.();
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [layerUri]); // runs when you setLayerUri (upload)
+	}, [layerUri]);
 
-	// Bind external controls WITHOUT reinitializing Canvas
+	// Binds external control elements (open/center/fill) to the internal FI/canvas handlers without reinitializing the canvas; also cleans up old listeners when the refs/elements change.
 	useEffect(()=>{
 		let fi = fiRef.current;
 		let canvas = canvasRef.current;
